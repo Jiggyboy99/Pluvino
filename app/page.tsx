@@ -1,6 +1,16 @@
 "use client";
 import { useState } from "react";
 
+// ---- Types ----
+type Transaction = {
+  id: string;
+  type: "fund" | "transfer";
+  amount: number;
+  note?: string;
+  to?: string;
+  date: string; // ISO
+};
+
 export default function Page() {
   // ---- State ----
   const [balance, setBalance] = useState<number>(0);
@@ -16,27 +26,44 @@ export default function Page() {
   const [note, setNote] = useState<string>("");
   const [pin, setPin] = useState<string>("");
 
+  // Transactions
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [showTxns, setShowTxns] = useState(false);
+
   // ---- Helpers ----
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n);
+  const parseAmt = (s: string) => Number(s.replace(/,/g, ""));
+  const nowISO = () => new Date().toISOString();
 
   // ---- Handlers ----
   const handleFund = () => {
-    const value = Number(amount.replace(/,/g, ""));
+    const value = parseAmt(amount);
     if (!value || value <= 0) return alert("Enter a valid amount");
+
     setBalance((b) => b + value);
+    setTransactions((tx) => [
+      { id: `txn_${Date.now()}`, type: "fund", amount: value, date: nowISO() },
+      ...tx,
+    ]);
+
     setAmount("");
     setFundOpen(false);
   };
 
   const handleTransfer = () => {
-    const value = Number(tAmount.replace(/,/g, ""));
+    const value = parseAmt(tAmount);
     if (!to.trim()) return alert("Enter recipient email/username");
     if (!value || value <= 0) return alert("Enter a valid amount");
     if (value > balance) return alert("Insufficient balance");
     if (!/^\d{4}$/.test(pin)) return alert("Enter a 4-digit PIN");
 
     setBalance((b) => b - value);
+    setTransactions((tx) => [
+      { id: `txn_${Date.now()}`, type: "transfer", amount: value, to, note, date: nowISO() },
+      ...tx,
+    ]);
+
     setTo("");
     setTAmount("");
     setNote("");
@@ -75,7 +102,7 @@ export default function Page() {
 
           <button
             className="px-4 py-3 rounded-xl border hover:bg-slate-50"
-            onClick={() => alert('Transactions drawer coming soon')}
+            onClick={() => setShowTxns(true)}
           >
             View Transactions
           </button>
@@ -167,9 +194,7 @@ export default function Page() {
                 onChange={(e) => setPin(e.target.value.replace(/[^\d]/g, "").slice(0, 4))}
               />
 
-              <div className="text-xs text-slate-500 mt-2">
-                Available: {fmt(balance)}
-              </div>
+              <div className="text-xs text-slate-500 mt-2">Available: {fmt(balance)}</div>
 
               <button
                 className="mt-4 w-full rounded-xl py-3 px-4 bg-slate-900 text-white hover:opacity-90"
@@ -177,6 +202,72 @@ export default function Page() {
               >
                 Send
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ------- TRANSACTIONS DRAWER ------- */}
+      {showTxns && (
+        <>
+          <div className="fixed inset-0 bg-black/40" onClick={() => setShowTxns(false)} />
+          <div className="fixed inset-x-0 bottom-0 md:inset-0 md:grid md:place-items-center">
+            <div className="md:w-[900px] md:max-w-[95vw] md:rounded-2xl bg-white shadow-2xl border border-slate-200 h-[70vh] md:h-[80vh] flex flex-col">
+              <div className="p-4 border-b flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Transactions</h3>
+                  <p className="text-xs text-slate-500">Recent funding and P2P activity</p>
+                </div>
+                <button className="text-slate-500" onClick={() => setShowTxns(false)}>✕</button>
+              </div>
+
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-slate-50 border-b text-slate-600">
+                    <tr>
+                      <th className="text-left px-4 py-2">Date</th>
+                      <th className="text-left px-4 py-2">Type</th>
+                      <th className="text-left px-4 py-2">Details</th>
+                      <th className="text-right px-4 py-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
+                          No transactions yet. Try funding or sending a transfer.
+                        </td>
+                      </tr>
+                    )}
+                    {transactions.map((t) => (
+                      <tr key={t.id} className="border-b hover:bg-slate-50">
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          {new Date(t.date).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 capitalize">{t.type}</td>
+                        <td className="px-4 py-2">
+                          {t.type === "fund" ? (
+                            <span className="text-slate-700">Wallet funding</span>
+                          ) : (
+                            <span className="text-slate-700">
+                              To <span className="font-medium">{t.to}</span>
+                              {t.note ? ` — ${t.note}` : ""}
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          className={`px-4 py-2 text-right font-medium ${
+                            t.type === "fund" ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {t.type === "fund" ? "+" : "-"}
+                          {fmt(t.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </>
