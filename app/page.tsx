@@ -30,11 +30,20 @@ export default function Page() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showTxns, setShowTxns] = useState(false);
 
+  // Search
+  const [q, setQ] = useState("");
+
   // ---- Helpers ----
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n);
   const parseAmt = (s: string) => Number(s.replace(/,/g, ""));
   const nowISO = () => new Date().toISOString();
+
+  // Derived filtered list
+  const filtered = transactions.filter((t) => {
+    const text = `${t.type} ${t.to ?? ""} ${t.note ?? ""}`.toLowerCase();
+    return text.includes(q.toLowerCase());
+  });
 
   // ---- Handlers ----
   const handleFund = () => {
@@ -221,6 +230,16 @@ export default function Page() {
                 <button className="text-slate-500" onClick={() => setShowTxns(false)}>✕</button>
               </div>
 
+              {/* Search */}
+              <div className="p-4 border-b">
+                <input
+                  className="w-full rounded-xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  placeholder="Search (recipient, note, type: fund/transfer)"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+
               <div className="flex-1 overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-slate-50 border-b text-slate-600">
@@ -232,14 +251,14 @@ export default function Page() {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.length === 0 && (
+                    {filtered.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
-                          No transactions yet. Try funding or sending a transfer.
+                          No transactions match your search.
                         </td>
                       </tr>
                     )}
-                    {transactions.map((t) => (
+                    {filtered.map((t) => (
                       <tr key={t.id} className="border-b hover:bg-slate-50">
                         <td className="px-4 py-2 whitespace-nowrap">
                           {new Date(t.date).toLocaleString()}
