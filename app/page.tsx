@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 // ---- Types ----
 type Transaction = {
@@ -10,9 +11,31 @@ type Transaction = {
   to?: string;
   date: string; // ISO
 };
+type User = { email: string };
 
 export default function Page() {
-  // ---- State ----
+  const router = useRouter();
+
+  // ---- Auth ----
+  const [user, setUser] = useState<User | null>(null);
+
+  // Redirect to /auth/login if not logged in
+  useEffect(() => {
+    const raw = localStorage.getItem("pluvino:user");
+    if (!raw) {
+      router.replace("/auth/login");
+      return;
+    }
+    setUser(JSON.parse(raw));
+  }, [router]);
+
+  const logout = () => {
+    localStorage.removeItem("pluvino:user");
+    setUser(null);
+    router.replace("/auth/login");
+  };
+
+  // ---- Wallet & Txns ----
   const [balance, setBalance] = useState<number>(0);
 
   // Fund
@@ -39,11 +62,19 @@ export default function Page() {
   const parseAmt = (s: string) => Number(s.replace(/,/g, ""));
   const nowISO = () => new Date().toISOString();
 
-  // Derived filtered list
   const filtered = transactions.filter((t) => {
     const text = `${t.type} ${t.to ?? ""} ${t.note ?? ""}`.toLowerCase();
     return text.includes(q.toLowerCase());
   });
+
+  // Gate actions: if logged out, send to login page
+  const requireAuth = (openFn: () => void) => {
+    if (!user) {
+      router.replace("/auth/login");
+      return;
+    }
+    openFn();
+  };
 
   // ---- Handlers ----
   const handleFund = () => {
@@ -80,38 +111,59 @@ export default function Page() {
     setTransferOpen(false);
   };
 
-  // ---- UI ----
   return (
     <main className="min-h-screen p-6 bg-gradient-to-b from-slate-50 to-white">
       <div className="max-w-3xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
         <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Pluvino — Payment Dashboard</h1>
-          <div className="text-sm text-slate-600">
-            Balance: <span className="font-semibold">{fmt(balance)}</span>
+          <div>
+            <h1 className="text-2xl font-semibold">Pluvino — Payment Dashboard</h1>
+            <p className="text-slate-600 text-sm">Single-page prototype with three actions.</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-slate-600">
+              Balance: <span className="font-semibold">{fmt(balance)}</span>
+            </div>
+
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 rounded-full border bg-slate-50 text-slate-700">
+                  {user.email}
+                </span>
+                <button className="text-sm underline" onClick={logout}>
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <button
+                className="px-3 py-1.5 text-sm rounded-xl border hover:bg-slate-50"
+                onClick={() => router.push("/auth/login")}
+              >
+                Login
+              </button>
+            )}
           </div>
         </header>
-
-        <p className="text-slate-600">Single-page prototype with three actions.</p>
 
         {/* Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
             className="px-4 py-3 rounded-xl bg-slate-900 text-white hover:opacity-90"
-            onClick={() => setFundOpen(true)}
+            onClick={() => requireAuth(() => setFundOpen(true))}
           >
             Fund
           </button>
 
-          <button
+        <button
             className="px-4 py-3 rounded-xl border hover:bg-slate-50"
-            onClick={() => setTransferOpen(true)}
+            onClick={() => requireAuth(() => setTransferOpen(true))}
           >
             P2P Transfer
           </button>
 
           <button
             className="px-4 py-3 rounded-xl border hover:bg-slate-50"
-            onClick={() => setShowTxns(true)}
+            onClick={() => requireAuth(() => setShowTxns(true))}
           >
             View Transactions
           </button>
